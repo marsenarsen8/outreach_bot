@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Контакты - Outreach Bot Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">👥 Контакты</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-primary" onclick="openAddModal()">
+                <i class="fas fa-plus"></i> Добавить контакт
+            </button>
+            <button type="button" class="btn btn-sm btn-success" onclick="document.getElementById('importFile').click()">
+                <i class="fas fa-upload"></i> Импорт
+            </button>
+            <button type="button" class="btn btn-sm btn-info" onclick="exportContacts()">
+                <i class="fas fa-download"></i> Экспорт
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Скрытый input для импорта -->
+<input type="file" id="importFile" accept=".csv" style="display: none;" onchange="importContacts(this)">
+
+<!-- Таблица контактов -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Список контактов</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="contactsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя</th>
+                        <th>Телефон</th>
+                        <th>Email</th>
+                        <th>Компания</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="contactsTableBody">
+                    <!-- Контакты будут загружены через JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления/редактирования контакта -->
+<div class="modal fade" id="contactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactModalTitle">Добавить контакт</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="contactForm">
+                    <input type="hidden" id="contactId">
+                    <div class="mb-3">
+                        <label for="contactName" class="form-label">Имя</label>
+                        <input type="text" class="form-control" id="contactName">
+                    </div>
+                    <div class="mb-3">
+                        <label for="contactPhone" class="form-label">Телефон *</label>
+                        <input type="text" class="form-control" id="contactPhone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="contactEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="contactEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label for="contactCompany" class="form-label">Компания</label>
+                        <input type="text" class="form-control" id="contactCompany">
+                    </div>
+                    <div class="mb-3">
+                        <label for="contactNotes" class="form-label">Заметки</label>
+                        <textarea class="form-control" id="contactNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveContact()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения удаления -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить этот контакт?</p>
+                <p id="deleteContactInfo" class="text-muted"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Удалить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let contacts = [];
+let contactToDelete = null;
+
+// Загрузка контактов при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadContacts();
+});
+
+// Загрузка контактов с сервера
+async function loadContacts() {
+    try {
+        const response = await fetch('/api/contacts');
+        contacts = await response.json();
+        renderContacts();
+    } catch (error) {
+        console.error('Ошибка загрузки контактов:', error);
+        showAlert('Ошибка загрузки контактов', 'danger');
+    }
+}
+
+// Отображение контактов в таблице
+function renderContacts() {
+    const tbody = document.getElementById('contactsTableBody');
+    tbody.innerHTML = '';
+    
+    contacts.forEach(contact => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${contact.id}</td>
+            <td>${contact.name || '-'}</td>
+            <td>${contact.phone}</td>
+            <td>${contact.email || '-'}</td>
+            <td>${contact.company || '-'}</td>
+            <td><span class="badge bg-${getStatusColor(contact.status)}">${contact.status || 'NEW'}</span></td>
+            <td>
+                <a class="btn btn-sm btn-outline-info" href="/dialogs/${contact.phone}"><i class="fas fa-comments"></i></a>
+                <button class="btn btn-sm btn-outline-primary" onclick="editContact(${contact.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteContact(${contact.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Получение цвета для статуса
+function getStatusColor(status) {
+    switch(status) {
+        case 'SENT': return 'primary';
+        case 'REPLY': return 'success';
+        case 'REFUSED': return 'danger';
+        case 'INTERESTED': return 'warning';
+        default: return 'secondary';
+    }
+}
+
+// Открытие модального окна для добавления
+function openAddModal() {
+    document.getElementById('contactModalTitle').textContent = 'Добавить контакт';
+    document.getElementById('contactForm').reset();
+    document.getElementById('contactId').value = '';
+    new bootstrap.Modal(document.getElementById('contactModal')).show();
+}
+
+// Редактирование контакта
+function editContact(id) {
+    const contact = contacts.find(c => c.id === id);
+    if (!contact) return;
+    
+    document.getElementById('contactModalTitle').textContent = 'Редактировать контакт';
+    document.getElementById('contactId').value = contact.id;
+    document.getElementById('contactName').value = contact.name;
+    document.getElementById('contactPhone').value = contact.phone;
+    document.getElementById('contactEmail').value = contact.email || '';
+    document.getElementById('contactCompany').value = contact.company || '';
+    document.getElementById('contactNotes').value = contact.notes || '';
+    
+    new bootstrap.Modal(document.getElementById('contactModal')).show();
+}
+
+// Сохранение контакта
+async function saveContact() {
+    const id = document.getElementById('contactId').value;
+    const contactData = {
+        name: document.getElementById('contactName').value || null,
+        phone: document.getElementById('contactPhone').value,
+        email: document.getElementById('contactEmail').value || null,
+        company: document.getElementById('contactCompany').value || null,
+        notes: document.getElementById('contactNotes').value || null
+    };
+    
+    try {
+        let response;
+        if (id) {
+            // Обновление
+            response = await fetch(`/api/contacts/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(contactData)
+            });
+        } else {
+            // Создание
+            response = await fetch('/api/contacts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(contactData)
+            });
+        }
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('contactModal')).hide();
+            loadContacts();
+            showAlert(id ? 'Контакт обновлен' : 'Контакт добавлен', 'success');
+        } else {
+            throw new Error('Ошибка сохранения');
+        }
+    } catch (error) {
+        console.error('Ошибка сохранения контакта:', error);
+        showAlert('Ошибка сохранения контакта', 'danger');
+    }
+}
+
+// Удаление контакта
+function deleteContact(id) {
+    const contact = contacts.find(c => c.id === id);
+    if (!contact) return;
+    
+    contactToDelete = id;
+    document.getElementById('deleteContactInfo').textContent = `${contact.name} (${contact.phone})`;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+// Подтверждение удаления
+async function confirmDelete() {
+    if (!contactToDelete) return;
+    
+    try {
+        const response = await fetch(`/api/contacts/${contactToDelete}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+            loadContacts();
+            showAlert('Контакт удален', 'success');
+        } else {
+            throw new Error('Ошибка удаления');
+        }
+    } catch (error) {
+        console.error('Ошибка удаления контакта:', error);
+        showAlert('Ошибка удаления контакта', 'danger');
+    }
+    
+    contactToDelete = null;
+}
+
+// Импорт контактов
+async function importContacts(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/api/contacts/import', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            loadContacts();
+            showAlert(result.message, 'success');
+        } else {
+            throw new Error('Ошибка импорта');
+        }
+    } catch (error) {
+        console.error('Ошибка импорта:', error);
+        showAlert('Ошибка импорта файла', 'danger');
+    }
+    
+    input.value = '';
+}
+
+// Экспорт контактов
+function exportContacts() {
+    window.location.href = '/api/contacts/export';
+}
+
+// Показ уведомлений
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.card'));
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+{% endblock %} 

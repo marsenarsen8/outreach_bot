@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}{{ filename }} - База знаний{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">📄 {{ filename }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="/knowledge" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Назад к базе знаний
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="downloadFile()">
+                <i class="fas fa-download"></i> Скачать
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-info" onclick="printFile()">
+                <i class="fas fa-print"></i> Печать
+            </button>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    <i class="fas fa-exclamation-triangle"></i> Ошибка: {{ error }}
+</div>
+{% endif %}
+
+<!-- Информация о файле -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">Информация о файле</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Название:</strong> {{ filename }}</p>
+                <p><strong>Тип файла:</strong> 
+                    {% if filename.endswith('.txt') %}
+                        <span class="badge bg-primary">Текстовый файл</span>
+                    {% elif filename.endswith('.md') %}
+                        <span class="badge bg-success">Markdown</span>
+                    {% elif filename.endswith('.csv') %}
+                        <span class="badge bg-info">CSV таблица</span>
+                    {% elif filename.endswith('.json') %}
+                        <span class="badge bg-warning">JSON</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Другой</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Размер:</strong> {{ (content|length / 1024)|round(1) }} KB</p>
+                <p><strong>Строк:</strong> {{ content.split('\n')|length }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Содержимое файла -->
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">
+            <i class="fas fa-file-text me-2"></i>Содержимое файла
+        </h6>
+    </div>
+    <div class="card-body">
+        {% if content %}
+            {% if filename.endswith('.md') %}
+                <!-- Markdown контент -->
+                <div class="markdown-content" id="markdownContent">
+                    <pre class="markdown-preview">{{ content }}</pre>
+                </div>
+            {% elif filename.endswith('.csv') %}
+                <!-- CSV таблица -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-bordered">
+                        {% set lines = content.split('\n') %}
+                        {% for line in lines %}
+                            {% if line.strip() %}
+                                <tr>
+                                    {% for cell in line.split(',') %}
+                                        <td>{{ cell.strip() }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </table>
+                </div>
+            {% elif filename.endswith('.json') %}
+                <!-- JSON контент -->
+                <div class="json-content">
+                    <pre class="json-preview" id="jsonContent">{{ content }}</pre>
+                </div>
+            {% else %}
+                <!-- Обычный текст -->
+                <div class="text-content">
+                    <pre class="text-preview" id="textContent">{{ content }}</pre>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Файл пуст или не может быть прочитан</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Действия с файлом -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-primary">Действия с файлом</h6>
+            </div>
+            <div class="card-body">
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-primary" onclick="editFile()">
+                        <i class="fas fa-edit"></i> Редактировать
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="copyToClipboard()">
+                        <i class="fas fa-copy"></i> Копировать
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="searchInFile()">
+                        <i class="fas fa-search"></i> Поиск
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="reloadKnowledge()">
+                        <i class="fas fa-sync"></i> Перезагрузить базу знаний
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function downloadFile() {
+    const content = `{{ content|replace('\n', '\\n')|replace('"', '\\"') }}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '{{ filename }}';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function printFile() {
+    window.print();
+}
+
+function editFile() {
+    alert('Функция редактирования файлов будет реализована позже');
+}
+
+function copyToClipboard() {
+    const content = `{{ content|replace('\n', '\\n')|replace('"', '\\"') }}`;
+    navigator.clipboard.writeText(content).then(() => {
+        alert('Содержимое файла скопировано в буфер обмена!');
+    }).catch(() => {
+        alert('Не удалось скопировать содержимое');
+    });
+}
+
+function searchInFile() {
+    const searchTerm = prompt('Введите текст для поиска:');
+    if (searchTerm) {
+        const content = document.querySelector('pre');
+        if (content) {
+            const text = content.textContent;
+            const regex = new RegExp(searchTerm, 'gi');
+            const highlightedText = text.replace(regex, match => `<mark>${match}</mark>`);
+            content.innerHTML = highlightedText;
+        }
+    }
+}
+
+function reloadKnowledge() {
+    if (confirm('Перезагрузить базу знаний? Это обновит данные для бота.')) {
+        // Здесь должна быть логика перезагрузки базы знаний
+        alert('Функция перезагрузки базы знаний будет реализована позже');
+    }
+}
+
+// Подсветка синтаксиса для JSON
+{% if filename.endswith('.json') %}
+document.addEventListener('DOMContentLoaded', function() {
+    const jsonContent = document.getElementById('jsonContent');
+    if (jsonContent) {
+        try {
+            const json = JSON.parse(jsonContent.textContent);
+            jsonContent.textContent = JSON.stringify(json, null, 2);
+        } catch (e) {
+            console.log('Не удалось отформатировать JSON');
+        }
+    }
+});
+{% endif %}
+
+// Подсветка синтаксиса для Markdown
+{% if filename.endswith('.md') %}
+document.addEventListener('DOMContentLoaded', function() {
+    const markdownContent = document.getElementById('markdownContent');
+    if (markdownContent) {
+        // Простая подсветка заголовков
+        const content = markdownContent.innerHTML;
+        const highlighted = content
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>');
+        markdownContent.innerHTML = highlighted;
+    }
+});
+{% endif %}
+</script>
+
+<style>
+@media print {
+    .sidebar, .btn-toolbar, .card-header, .btn-group {
+        display: none !important;
+    }
+    .main-content {
+        margin-left: 0 !important;
+    }
+    .card {
+        border: 1px solid #ddd !important;
+        box-shadow: none !important;
+    }
+}
+
+.text-preview, .json-preview, .markdown-preview {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.json-preview {
+    background-color: #f8f9fa;
+}
+
+.markdown-preview h1, .markdown-preview h2, .markdown-preview h3 {
+    color: #495057;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.markdown-preview strong {
+    font-weight: bold;
+}
+
+.markdown-preview em {
+    font-style: italic;
+}
+
+.markdown-preview code {
+    background-color: #e9ecef;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+}
+
+mark {
+    background-color: #fff3cd;
+    padding: 0.1rem 0.2rem;
+    border-radius: 0.25rem;
+}
+</style>
+{% endblock %} 

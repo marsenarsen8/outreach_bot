@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Диалоги</h2>
+    <div class="list-group mt-3">
+        {% for dialog in dialogs %}
+        <a href="/dialogs/{{ dialog.phone }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <div>
+                <strong>{{ dialog.name }}</strong><br>
+                <small class="text-muted">{{ dialog.last_text|truncate(50, True, '...') }}</small>
+            </div>
+            <div class="d-flex flex-column align-items-end">
+                <span class="badge bg-secondary mb-1">{{ dialog.last_time }}</span>
+                {% if dialog.last_status == 'ДА' %}
+                    <span class="badge bg-success">Интересно</span>
+                {% elif dialog.last_status == 'НЕТ' %}
+                    <span class="badge bg-danger">Отказ</span>
+                {% elif dialog.last_status %}
+                    <span class="badge bg-info">{{ dialog.last_status }}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% else %}
+        <div class="alert alert-info">Нет диалогов</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 
