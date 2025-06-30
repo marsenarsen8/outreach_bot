@@ -19,8 +19,8 @@ max_retries = 3  # Максимальное количество попыток 
 timeout_seconds = 15  # Таймаут для HTTP запросов
 
 # Защита от лимитов Google Gemini
-gemini_rate_limit = 15  # Запросов в минуту
-gemini_daily_limit = 200  # Запросов в день
+gemini_rate_limit = 15  # Запросов в минуту (обновлено)
+gemini_daily_limit = 200  # Запросов в день (обновлено)
 gemini_cooldown_seconds = 4  # Задержка между запросами к Gemini (чтобы не превышать 15/мин)
 
 # Настройки для обработки аудио
